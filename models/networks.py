@@ -764,9 +764,11 @@ class Generator(nn.Module):
         self.up_block2 = UpsampleBLock(128, 2)
         self.up_block3 = UpsampleBLock(128, 2)
 
-        #self.mix_conv1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.mix_conv1 = nn.Conv2d(640, 512, kernel_size=3, padding=1)
+        self.mix_conv2 = nn.Conv2d(640, 512, kernel_size=3, padding=1)
 
         self.SR = nn.Conv2d(128, 3, kernel_size=3, padding=1)
+
         self.classifier = nn.Conv2d(640, num_cls, kernel_size=3, padding=1)
 
         # 初始化参数
@@ -789,9 +791,15 @@ class Generator(nn.Module):
         imagesr = F.tanh(sr_pre)
 
         # 分割
-        up8_feature = nn.functional.upsample(feature, (h, w))
-        up8_feature_conv = torch.cat([up8_feature, up_block3], dim=1)
-        pre = self.classifier(up8_feature_conv)
+        up4_feature = nn.functional.upsample(feature, (int(h / 4), int(w / 4)))
+        up4_feature_cat = torch.cat([up4_feature, up_block1], dim=1)
+        up4_feature_cat_conv = self.mix_conv1(up4_feature_cat)
+        up2_feature_cat_conv = nn.functional.upsample(up4_feature_cat_conv, (int(h / 2), int(w / 2)))
+        up2_feature_cat_conv_cat = torch.cat([up2_feature_cat_conv, up_block2], dim=1)
+        up_feature_cat_conv = self.mix_conv2(up2_feature_cat_conv_cat)
+        up_feature_cat_conv = nn.functional.upsample(up_feature_cat_conv, (h, w))
+        up_feature_cat_conv_cat = torch.cat([up_feature_cat_conv, up_block3], dim=1)
+        pre = self.classifier(up_feature_cat_conv_cat)
 
         return feature_reduce, pre, imagesr  #[-1, 1]
 class ResASPPB(nn.Module):
